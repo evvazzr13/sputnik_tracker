@@ -7,11 +7,13 @@ import Register from './pages/Register'
 import CounselorDashboard from './pages/counselor/Dashboard'
 import TeamPage from './pages/counselor/TeamPage'
 import ScheduleHistory from './pages/counselor/ScheduleHistory'
+import CounselorEvents from './pages/counselor/Events'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminTeams from './pages/admin/Teams'
 import AdminReports from './pages/admin/Reports'
 import AdminDayPlan from './pages/admin/DayPlan'
 import AdminUsers from './pages/admin/Users'
+import AdminEvents from './pages/admin/Events'
 
 function RootRedirect() {
   const { userProfile } = useAuth()
@@ -29,49 +31,17 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<RootRedirect />} />
 
-          {/* Counselor routes */}
-          <Route path="/counselor" element={
-            <ProtectedRoute requireRole="counselor">
-              <Layout><CounselorDashboard /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/counselor/team" element={
-            <ProtectedRoute requireRole="counselor">
-              <Layout><TeamPage /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/counselor/schedule" element={
-            <ProtectedRoute requireRole="counselor">
-              <Layout><ScheduleHistory /></Layout>
-            </ProtectedRoute>
-          } />
+          <Route path="/counselor" element={<ProtectedRoute requireRole="counselor"><Layout><CounselorDashboard /></Layout></ProtectedRoute>} />
+          <Route path="/counselor/team" element={<ProtectedRoute requireRole="counselor"><Layout><TeamPage /></Layout></ProtectedRoute>} />
+          <Route path="/counselor/events" element={<ProtectedRoute requireRole="counselor"><Layout><CounselorEvents /></Layout></ProtectedRoute>} />
+          <Route path="/counselor/schedule" element={<ProtectedRoute requireRole="counselor"><Layout><ScheduleHistory /></Layout></ProtectedRoute>} />
 
-          {/* Admin routes */}
-          <Route path="/admin" element={
-            <ProtectedRoute requireRole="admin">
-              <Layout><AdminDashboard /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/teams" element={
-            <ProtectedRoute requireRole="admin">
-              <Layout><AdminTeams /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/reports" element={
-            <ProtectedRoute requireRole="admin">
-              <Layout><AdminReports /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/dayplan" element={
-            <ProtectedRoute requireRole="admin">
-              <Layout><AdminDayPlan /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <ProtectedRoute requireRole="admin">
-              <Layout><AdminUsers /></Layout>
-            </ProtectedRoute>
-          } />
+          <Route path="/admin" element={<ProtectedRoute requireRole="admin"><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
+          <Route path="/admin/teams" element={<ProtectedRoute requireRole="admin"><Layout><AdminTeams /></Layout></ProtectedRoute>} />
+          <Route path="/admin/events" element={<ProtectedRoute requireRole="admin"><Layout><AdminEvents /></Layout></ProtectedRoute>} />
+          <Route path="/admin/reports" element={<ProtectedRoute requireRole="admin"><Layout><AdminReports /></Layout></ProtectedRoute>} />
+          <Route path="/admin/dayplan" element={<ProtectedRoute requireRole="admin"><Layout><AdminDayPlan /></Layout></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute requireRole="admin"><Layout><AdminUsers /></Layout></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

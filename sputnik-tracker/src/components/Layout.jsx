@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import {
-  Home, Users, ClipboardList, Calendar, BarChart2,
-  LogOut, Menu, X, ChevronDown, Star
-} from 'lucide-react'
+import { Home, Users, ClipboardList, Calendar, BarChart2, LogOut, Menu, X, Star, Sparkles } from 'lucide-react'
 
 const ADMIN_ROLE_LABELS = {
   senior_counselor: 'Старший вожатый',
@@ -24,12 +21,14 @@ export default function Layout({ children }) {
   const counselorLinks = [
     { to: '/counselor', label: 'Главная', icon: Home },
     { to: '/counselor/team', label: 'Моя команда', icon: Users },
+    { to: '/counselor/events', label: 'Мероприятия', icon: Sparkles },
     { to: '/counselor/schedule', label: 'История планов', icon: Calendar },
   ]
 
   const adminLinks = [
     { to: '/admin', label: 'Главная', icon: Home },
     { to: '/admin/teams', label: 'Команды', icon: Users },
+    { to: '/admin/events', label: 'Мероприятия', icon: Sparkles },
     { to: '/admin/reports', label: 'Отчёты', icon: BarChart2 },
     { to: '/admin/dayplan', label: 'План дня', icon: Calendar },
     { to: '/admin/users', label: 'Пользователи', icon: ClipboardList },
@@ -49,7 +48,6 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="bg-blue-700 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -57,17 +55,12 @@ export default function Layout({ children }) {
             <span className="font-bold text-lg tracking-wide">Спутник</span>
           </div>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
             {links.map(({ to, label, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
+              <Link key={to} to={to}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-                  ${isActive(to) ? 'bg-blue-800 text-white' : 'text-blue-100 hover:bg-blue-600'}`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
+                  ${isActive(to) ? 'bg-blue-800 text-white' : 'text-blue-100 hover:bg-blue-600'}`}>
+                <Icon className="w-4 h-4" />{label}
               </Link>
             ))}
           </nav>
@@ -88,29 +81,22 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* Mobile nav */}
         {menuOpen && (
           <div className="md:hidden bg-blue-800 px-4 pb-3">
             <div className="text-sm text-blue-200 py-2 border-b border-blue-700 mb-2">
               {userProfile?.fullName} · {isAdmin ? ADMIN_ROLE_LABELS[userProfile?.adminRole] || 'Администратор' : `Команда ${userProfile?.teamNumber || '—'}`}
             </div>
             {links.map(({ to, label, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                onClick={() => setMenuOpen(false)}
+              <Link key={to} to={to} onClick={() => setMenuOpen(false)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-1 transition-colors
-                  ${isActive(to) ? 'bg-blue-900 text-white' : 'text-blue-100 hover:bg-blue-700'}`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
+                  ${isActive(to) ? 'bg-blue-900 text-white' : 'text-blue-100 hover:bg-blue-700'}`}>
+                <Icon className="w-4 h-4" />{label}
               </Link>
             ))}
           </div>
         )}
       </header>
 
-      {/* Content */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
         {children}
       </main>
