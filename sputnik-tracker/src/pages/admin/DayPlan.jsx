@@ -20,7 +20,7 @@ export default function AdminDayPlan() {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [published, setPublished] = useState(false)
-  const [newFixed, setNewFixed] = useState({ time: '', title: '' })
+  const [newFixed, setNewFixed] = useState({ time: '', title: '', brigadeGroup: 'all' })
   const [newDraft, setNewDraft] = useState({ time: '', title: '' })
   const [activeTab, setActiveTab] = useState('plan')
   const [newReminder, setNewReminder] = useState('')
@@ -64,9 +64,13 @@ export default function AdminDayPlan() {
   async function addFixedBlock() {
     if (!newFixed.time || !newFixed.title.trim()) return
     const order = fixedBlocks.length
-    const ref = await addDoc(collection(db, 'fixedBlocks'), { time: newFixed.time, title: newFixed.title.trim(), order })
-    setFixedBlocks(prev => [...prev, { id: ref.id, time: newFixed.time, title: newFixed.title.trim(), order }].sort((a, b) => a.time.localeCompare(b.time)))
-    setNewFixed({ time: '', title: '' })
+    const ref = await addDoc(collection(db, 'fixedBlocks'), {
+      time: newFixed.time, title: newFixed.title.trim(),
+      brigadeGroup: newFixed.brigadeGroup || 'all', order,
+    })
+    setFixedBlocks(prev => [...prev, { id: ref.id, time: newFixed.time, title: newFixed.title.trim(), brigadeGroup: newFixed.brigadeGroup || 'all', order }]
+      .sort((a, b) => a.time.localeCompare(b.time)))
+    setNewFixed({ time: '', title: '', brigadeGroup: 'all' })
   }
 
   async function deleteFixedBlock(id) {
@@ -260,14 +264,21 @@ export default function AdminDayPlan() {
               <div className="text-center py-6 text-gray-400 text-sm">Нет событий</div>
             ) : (
               <div className="space-y-1.5 mt-3">
-                {allPreview.map((block, i) => (
-                  <div key={block.id || i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                    <span className="text-sm font-mono text-blue-700 font-semibold w-12">{block.time}</span>
-                    <span className="flex-1 text-sm">{block.title}</span>
-                    {block.isFixed && <span className="badge-gray text-xs">постоянно</span>}
-                    {block.eventId && <span className="badge-blue text-xs">мероприятие</span>}
-                  </div>
-                ))}
+                {allPreview.map((block, i) => {
+                  const bgValue = block.brigadeGroup || 'all'
+                  const bgLabel = BRIGADE_GROUPS.find(g => g.value === bgValue)?.label
+                  return (
+                    <div key={block.id || i} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50">
+                      <span className="text-sm font-mono text-blue-700 font-semibold w-12 flex-shrink-0">{block.time}</span>
+                      <span className="flex-1 text-sm">{block.title}</span>
+                      {bgValue !== 'all' && (
+                        <span className="badge-yellow text-xs flex-shrink-0">{bgLabel}</span>
+                      )}
+                      {block.isFixed && <span className="badge-gray text-xs flex-shrink-0">постоянно</span>}
+                      {block.eventId && <span className="badge-blue text-xs flex-shrink-0">мероприятие</span>}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -277,25 +288,40 @@ export default function AdminDayPlan() {
       {activeTab === 'fixed' && (
         <div className="card space-y-4 max-w-xl">
           <h2 className="font-semibold flex items-center gap-2"><Pin className="w-4 h-4 text-orange-500" /> Постоянные блоки</h2>
-          <p className="text-sm text-gray-500">Отображаются каждый день без изменений</p>
+          <p className="text-sm text-gray-500">Отображаются каждый день. Можно ограничить по дружине.</p>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Для какой дружины:</label>
+            <select className="input text-sm" value={newFixed.brigadeGroup} onChange={e => setNewFixed(p => ({ ...p, brigadeGroup: e.target.value }))}>
+              {BRIGADE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+            </select>
+          </div>
+
           <div className="flex gap-2">
             <input type="time" className="input w-28 flex-shrink-0" value={newFixed.time} onChange={e => setNewFixed(p => ({ ...p, time: e.target.value }))} />
             <input type="text" className="input" value={newFixed.title} onChange={e => setNewFixed(p => ({ ...p, title: e.target.value }))}
               placeholder="Название события" onKeyDown={e => e.key === 'Enter' && addFixedBlock()} />
             <button onClick={addFixedBlock} disabled={!newFixed.time || !newFixed.title.trim()} className="btn-primary px-3 flex-shrink-0"><Plus className="w-4 h-4" /></button>
           </div>
+
           {fixedBlocks.length === 0 ? (
             <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">Постоянные блоки не добавлены</div>
           ) : (
             <div className="space-y-1.5">
-              {fixedBlocks.map(block => (
-                <div key={block.id} className="flex items-center gap-2 p-2 rounded-lg bg-orange-50">
-                  <span className="text-sm font-mono text-orange-700 font-semibold w-12">{block.time}</span>
-                  <span className="flex-1 text-sm">{block.title}</span>
-                  <span className="badge-yellow text-xs">постоянно</span>
-                  <button onClick={() => deleteFixedBlock(block.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              ))}
+              {fixedBlocks.map(block => {
+                const brigLabel = BRIGADE_GROUPS.find(g => g.value === (block.brigadeGroup || 'all'))?.label
+                return (
+                  <div key={block.id} className="flex items-center gap-2 p-2 rounded-lg bg-orange-50">
+                    <span className="text-sm font-mono text-orange-700 font-semibold w-12">{block.time}</span>
+                    <span className="flex-1 text-sm">{block.title}</span>
+                    {block.brigadeGroup && block.brigadeGroup !== 'all'
+                      ? <span className="badge-yellow text-xs">{brigLabel}</span>
+                      : <span className="badge-yellow text-xs">все дружины</span>
+                    }
+                    <button onClick={() => deleteFixedBlock(block.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -316,13 +342,18 @@ export default function AdminDayPlan() {
                 <div className="space-y-1 mt-3">
                   {[...fixedBlocks.map(b => ({ ...b, isFixed: true })), ...(plan.blocks || [])]
                     .sort((a, b) => a.time.localeCompare(b.time))
-                    .map((block, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm py-1">
-                        <span className="font-mono text-blue-600 w-12">{block.time}</span>
-                        <span className="text-gray-700">{block.title}</span>
-                        {block.isFixed && <span className="text-xs text-gray-400">(постоянно)</span>}
-                      </div>
-                    ))}
+                    .map((block, i) => {
+                      const bgValue = block.brigadeGroup || 'all'
+                      const bgLabel = BRIGADE_GROUPS.find(g => g.value === bgValue)?.label
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-sm py-1">
+                          <span className="font-mono text-blue-600 w-12">{block.time}</span>
+                          <span className="text-gray-700 flex-1">{block.title}</span>
+                          {bgValue !== 'all' && <span className="badge-yellow text-xs">{bgLabel}</span>}
+                          {block.isFixed && <span className="text-xs text-gray-400">(постоянно)</span>}
+                        </div>
+                      )
+                    })}
                 </div>
               </div>
             ))

@@ -4,6 +4,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { useAuth } from '../../contexts/AuthContext'
+import { blockVisibleForBrigade } from '../../utils/brigade'
 import { Star, Save, CheckCircle } from 'lucide-react'
 
 export default function CounselorEvents() {
@@ -17,6 +18,7 @@ export default function CounselorEvents() {
 
   const teamId = userProfile?.teamId
   const teamNumber = userProfile?.teamNumber
+  const brigadeId = userProfile?.brigadeId
 
   useEffect(() => {
     async function load() {
@@ -26,7 +28,9 @@ export default function CounselorEvents() {
           getDocs(query(collection(db, 'events'), orderBy('createdAt', 'desc'))),
           getDocs(query(collection(db, 'eventSubmissions'), where('teamId', '==', teamId))),
         ])
-        setEvents(eventsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+        // Filter events by brigade
+        const allEvents = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        setEvents(allEvents.filter(ev => blockVisibleForBrigade(ev.brigadeGroup || 'all', brigadeId)))
         const subs = {}
         const initDrafts = {}
         subsSnap.docs.forEach(d => {

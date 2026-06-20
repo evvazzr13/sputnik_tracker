@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '../../firebase/config'
+import { useAuth } from '../../contexts/AuthContext'
 import { format, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 import { DayInfoPreview } from '../admin/DayPlan'
+import { blockVisibleForBrigade, BRIGADE_GROUPS } from '../../utils/brigade'
 
 export default function ScheduleHistory() {
+  const { userProfile } = useAuth()
   const [plans, setPlans] = useState([])
   const [fixedBlocks, setFixedBlocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
+  const myBrigadeId = userProfile?.brigadeId
 
   useEffect(() => {
     async function load() {
@@ -31,7 +35,15 @@ export default function ScheduleHistory() {
   }, [])
 
   function getAllBlocks(plan) {
-    return [...fixedBlocks, ...(plan.blocks || [])].sort((a, b) => a.time.localeCompare(b.time))
+    return [
+      ...fixedBlocks.filter(b => blockVisibleForBrigade(b.brigadeGroup, myBrigadeId)),
+      ...(plan.blocks || []).filter(b => blockVisibleForBrigade(b.brigadeGroup, myBrigadeId)),
+    ].sort((a, b) => a.time.localeCompare(b.time))
+  }
+
+  function getBrigadeLabel(brigadeGroup) {
+    if (!brigadeGroup || brigadeGroup === 'all') return null
+    return BRIGADE_GROUPS.find(g => g.value === brigadeGroup)?.label
   }
 
   function formatDate(dateStr) {
@@ -78,13 +90,16 @@ export default function ScheduleHistory() {
                 <div className="border-t border-gray-100 px-6 pb-4 pt-3">
                   <DayInfoPreview theme={plan.theme} dutyTeams={plan.dutyTeams} reminders={plan.reminders} />
                   <div className="space-y-1 mt-2">
-                    {blocks.map((block, i) => (
-                      <div key={block.id || i} className="flex items-start gap-3 py-1.5">
-                        <span className="text-sm font-mono text-blue-700 font-semibold w-12 flex-shrink-0">{block.time}</span>
-                        <span className="text-gray-800 text-sm">{block.title}</span>
-                        {block.isFixed && <span className="ml-auto badge-gray text-xs flex-shrink-0">постоянно</span>}
-                      </div>
-                    ))}
+                    {blocks.map((block, i) => {
+                      const brigLabel = getBrigadeLabel(block.brigadeGroup)
+                      return (
+                        <div key={block.id || i} className="flex items-start gap-3 py-1.5">
+                          <span className="text-sm font-mono text-blue-700 font-semibold w-12 flex-shrink-0">{block.time}</span>
+                          <span className="text-gray-800 text-sm flex-1">{block.title}</span>
+                          {brigLabel && <span className="ml-auto badge-yellow text-xs flex-shrink-0">{brigLabel}</span>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

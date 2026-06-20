@@ -4,6 +4,7 @@ import {
   doc, query, orderBy, where, serverTimestamp, arrayUnion, arrayRemove
 } from 'firebase/firestore'
 import { db } from '../../firebase/config'
+import { getBrigade } from '../../utils/brigade'
 import { Plus, Trash2, Edit2, Save, X, Users, UserPlus } from 'lucide-react'
 
 export default function AdminTeams() {
@@ -97,15 +98,18 @@ export default function AdminTeams() {
         return
       }
       // Add counselor to team
+      const brigade = getBrigade(team?.number)
       await updateDoc(doc(db, 'teams', teamId), {
         counselorIds: arrayUnion(counselorId),
-        counselorId: null, // clear old field
+        counselorId: null,
       })
-      // Update counselor profile
+      // Update counselor profile with brigade info
       await updateDoc(doc(db, 'users', counselorId), {
         teamId,
         teamNumber: team?.number || null,
         approved: true,
+        brigadeId: brigade.id || null,
+        brigadeName: brigade.short || null,
       })
       setAssigningTo(null)
       setSelectedCounselor('')
@@ -129,6 +133,8 @@ export default function AdminTeams() {
         teamId: null,
         teamNumber: null,
         approved: false,
+        brigadeId: null,
+        brigadeName: null,
       })
       loadAll()
     } catch (err) {
