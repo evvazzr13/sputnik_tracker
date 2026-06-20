@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { collection, getDocs, orderBy, query, where, doc, getDoc } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { useAuth } from '../../contexts/AuthContext'
-import { format, parseISO, addDays } from 'date-fns'
+import { format, parseISO, addDays, subDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { Clock, Calendar, CalendarDays, ChevronRight, Sparkles, ChevronLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -11,47 +11,39 @@ import { blockVisibleForBrigade, BRIGADE_GROUPS } from '../../utils/brigade'
 
 export default function CounselorDashboard() {
   const { userProfile } = useAuth()
-  const [allPlans, setAllPlans] = useState([])
+  const [plansByDate, setPlansByDate] = useState({}) // date -> plan data
   const [fixedBlocks, setFixedBlocks] = useState([])
   const [hasEventInPlan, setHasEventInPlan] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const today = format(new Date(), 'yyyy-MM-dd')
-  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
   const todayLabel = format(new Date(), 'd MMMM yyyy', { locale: ru })
   const myBrigadeId = userProfile?.brigadeId
 
-  // Tomorrow's plan is available after 23:30
   const now = new Date()
   const tomorrowAvailable = now.getHours() > 23 || (now.getHours() === 23 && now.getMinutes() >= 30)
+  const maxDate = tomorrowAvailable ? format(addDays(new Date(), 1), 'yyyy-MM-dd') : today
 
   useEffect(() => {
     async function load() {
       try {
         const [fixedSnap, plansSnap] = await Promise.all([
           getDocs(query(collection(db, 'fixedBlocks'), orderBy('order'))),
-          getDocs(query(collection(db, 'dayPlans'), where('isPublished', '==', true), orderBy('date', 'asc'))),
+          getDocs(query(collection(db, 'dayPlans'), where('isPublished', '==', true))),
         ])
         setFixedBlocks(fixedSnap.docs.map(d => ({ id: d.id, ...d.data(), isFixed: true })))
 
-        let plans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        // Filter out tomorrow if not available yet
-        if (!tomorrowAvailable) {
-          plans = plans.filter(p => p.date <= today)
-        }
-        setAllPlans(plans)
-
-        // Default: today's plan (or latest past)
-        const todayPlan = plans.find(p => p.date === today)
-        setSelectedDate(todayPlan ? today : (plans[plans.length - 1]?.date || null))
+        const byDate = {}
+        plansSnap.docs.forEach(d => { byDate[d.id] = { id: d.id, ...d.data() } })
+        setPlansByDate(byDate)
       } catch (err) { console.error(err) }
       finally { setLoading(false) }
     }
     load()
-  }, [today, tomorrowAvailable, myBrigadeId])
+  }, [])
 
-  const activePlan = allPlans.find(p => p.date === selectedDate)
+  const activePlan = plansByDate[selectedDate] || null
 
   useEffect(() => {
     if (!activePlan) { setHasEventInPlan(false); return }
@@ -67,17 +59,38 @@ export default function CounselorDashboard() {
   ].sort((a, b) => a.time.localeCompare(b.time))
 
   function formatDateLabel(dateStr) {
-    if (!dateStr) return ''
-    try {
-      if (dateStr === today) return 'Сегодня'
-      if (dateStr === tomorrow) return 'Завтра'
-      return format(parseISO(dateStr), 'd MMMM', { locale: ru })
-    } catch { return dateStr }
+    if (dateStr === today) return 'Сегодня'
+    if (dateStr === format(addDays(new Date(), 1), 'yyyy-MM-dd')) return 'Завтра'
+    if (dateStr === format(subDays(new Date(), 1), 'yyyy-MM-dd')) return 'Вчера'
+    try { return format(parseISO(dateStr), 'd MMM', { locale: ru }) }
+    catch { return dateStr }
   }
 
   function getBrigadeLabel(brigadeGroup) {
     if (!brigadeGroup || brigadeGroup === 'all') return null
     return BRIGADE_GROUPS.find(g => g.value === brigadeGroup)?.label
+  }
+
+  function prevDate() {
+    const d = subDays(parseISO(selectedDate), 1)
+    setSelectedDate(format(d, 'yyyy-MM-dd'))
+  }
+
+  function nextDate() {
+    if (selectedDate >= maxDate) return
+    const d = addDays(parseISO(selectedDate), 1)
+    setSelectedDate(format(d, 'yyyy-MM-dd'))
+  }
+
+  const canGoNext = selectedDate < maxDate
+
+  // Show last 5 days + today + (tomorrow if available) as tabs
+  const dateRange = []
+  for (let i = 4; i >= 0; i--) {
+    dateRange.push(format(subDays(new Date(), i), 'yyyy-MM-dd'))
+  }
+  if (tomorrowAvailable) {
+    dateRange.push(format(addDays(new Date(), 1), 'yyyy-MM-dd'))
   }
 
   return (
@@ -120,67 +133,76 @@ export default function CounselorDashboard() {
         )}
       </div>
 
-      {/* Day plan */}
+      {/* Day plan card */}
       <div className="card">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-600" />
             План дня
           </h2>
+        </div>
 
-          {/* Date tabs */}
-          {allPlans.length > 0 && (
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              {allPlans.map(plan => (
-                <button
-                  key={plan.date}
-                  onClick={() => setSelectedDate(plan.date)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                    ${selectedDate === plan.date
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  {formatDateLabel(plan.date)}
-                </button>
-              ))}
+        {/* Date navigation */}
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={prevDate} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
+          </button>
+
+          <div className="flex-1 overflow-x-auto">
+            <div className="flex gap-1 min-w-0">
+              {dateRange.map(date => {
+                const hasPlan = !!plansByDate[date]
+                return (
+                  <button
+                    key={date}
+                    onClick={() => setSelectedDate(date)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors relative
+                      ${selectedDate === date
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-500 hover:bg-gray-100 border border-gray-200'}`}
+                  >
+                    {formatDateLabel(date)}
+                    {hasPlan && selectedDate !== date && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                    )}
+                  </button>
+                )
+              })}
             </div>
+          </div>
+
+          <button onClick={nextDate} disabled={!canGoNext}
+            className={`p-1.5 rounded-lg border border-gray-200 transition-colors
+              ${canGoNext ? 'hover:bg-gray-50' : 'opacity-30 cursor-not-allowed'}`}>
+            <ChevronRight className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="text-sm text-gray-400 mb-3">
+          {format(parseISO(selectedDate), 'd MMMM yyyy (EEEE)', { locale: ru })}
+          {!tomorrowAvailable && (
+            <span className="ml-2 text-xs">· план на завтра появится в 23:30</span>
           )}
         </div>
 
         {loading ? (
           <div className="py-8 text-center text-gray-400">Загрузка...</div>
         ) : !activePlan ? (
-          <div className="py-8 text-center text-gray-400">
-            <Calendar className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p>
-              {allPlans.length === 0
-                ? 'План дня ещё не опубликован'
-                : 'Выберите дату выше'}
-            </p>
-            {!tomorrowAvailable && (
-              <p className="text-sm mt-1 text-gray-400">План на завтра станет доступен в 23:30</p>
-            )}
+          <div className="py-6 text-center text-gray-400">
+            <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">План на этот день не опубликован</p>
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm text-gray-500">
-                {format(parseISO(activePlan.date), 'd MMMM yyyy (EEEE)', { locale: ru })}
-              </span>
-              <span className="badge-green text-xs">Опубликован</span>
-              {activePlan.date === tomorrow && <span className="badge-blue text-xs">На завтра</span>}
-            </div>
-
             <DayInfoPreview
               theme={activePlan.theme}
               dutyTeams={activePlan.dutyTeams}
               reminders={activePlan.reminders}
             />
-
             {myBlocks.length === 0 ? (
               <div className="py-4 text-center text-gray-400 text-sm">Нет событий для вашей дружины</div>
             ) : (
-              <div className="space-y-1 mt-3">
+              <div className="space-y-1 mt-2">
                 {myBlocks.map((block, i) => {
                   const brigLabel = getBrigadeLabel(block.brigadeGroup)
                   return (
@@ -189,7 +211,6 @@ export default function CounselorDashboard() {
                         {block.time}
                       </span>
                       <span className="text-gray-800 flex-1">{block.title}</span>
-                      {/* Only show brigade badge if event is for specific brigades, NOT for all */}
                       {brigLabel && (
                         <span className="ml-auto badge-yellow text-xs flex-shrink-0">{brigLabel}</span>
                       )}

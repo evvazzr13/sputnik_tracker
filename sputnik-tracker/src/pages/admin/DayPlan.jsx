@@ -27,8 +27,15 @@ export default function AdminDayPlan() {
 
   // Day info fields
   const [theme, setTheme] = useState('')
-  const [dutyTeams, setDutyTeams] = useState('')
+  const [dutyTeam1, setDutyTeam1] = useState('')
+  const [dutyTeam2, setDutyTeam2] = useState('')
   const [reminders, setReminders] = useState([])
+
+  // Compute dutyTeams string for storage/display
+  function getDutyTeamsString(t1, t2) {
+    const parts = [t1, t2].filter(Boolean).map(n => `Команда №${n}`)
+    return parts.join(', ')
+  }
 
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
   const tomorrowLabel = format(addDays(new Date(), 1), 'd MMMM yyyy (EEEE)', { locale: ru })
@@ -50,8 +57,12 @@ export default function AdminDayPlan() {
         const data = draftSnap.data()
         setDraftBlocks(data.blocks || [])
         setTheme(data.theme || '')
-        setDutyTeams(data.dutyTeams || '')
         setReminders(data.reminders || [])
+        // Parse dutyTeam1/dutyTeam2 (new format) or legacy dutyTeams string
+        if (data.dutyTeam1 !== undefined) {
+          setDutyTeam1(data.dutyTeam1 || '')
+          setDutyTeam2(data.dutyTeam2 || '')
+        }
       }
       setPublishedDates(publishedSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.isPublished))
     } catch (err) {
@@ -79,6 +90,7 @@ export default function AdminDayPlan() {
   }
 
   const [newBrigadeGroup, setNewBrigadeGroup] = useState('all')
+  const [selectedEventId, setSelectedEventId] = useState('')
 
   function addDraftBlock() {
     if (!newDraft.time || !newDraft.title.trim()) return
@@ -86,11 +98,18 @@ export default function AdminDayPlan() {
     setNewDraft({ time: '', title: '' })
   }
 
-  function addEventBlock(eventId) {
-    const event = events.find(e => e.id === eventId)
+  function addEventBlock() {
+    if (!selectedEventId || !newDraft.time) return
+    const event = events.find(e => e.id === selectedEventId)
     if (!event) return
-    const time = newDraft.time || '12:00'
-    setDraftBlocks(prev => [...prev, { id: Date.now().toString(), time, title: event.name, eventId, brigadeGroup: newBrigadeGroup }].sort((a, b) => a.time.localeCompare(b.time)))
+    setDraftBlocks(prev => [...prev, {
+      id: Date.now().toString(),
+      time: newDraft.time,
+      title: event.name,
+      eventId: selectedEventId,
+      brigadeGroup: newBrigadeGroup,
+    }].sort((a, b) => a.time.localeCompare(b.time)))
+    setSelectedEventId('')
   }
 
   function removeDraftBlock(id) {
@@ -107,7 +126,12 @@ export default function AdminDayPlan() {
     setReminders(prev => prev.filter((_, idx) => idx !== i))
   }
 
-  const draftData = { date: tomorrow, blocks: draftBlocks, theme, dutyTeams, reminders }
+  const draftData = {
+    date: tomorrow, blocks: draftBlocks, theme,
+    dutyTeam1, dutyTeam2,
+    dutyTeams: getDutyTeamsString(dutyTeam1, dutyTeam2),
+    reminders,
+  }
 
   async function saveDraft() {
     setSaving(true)
@@ -164,8 +188,26 @@ export default function AdminDayPlan() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Дежурные команды</label>
-                <input type="text" className="input" value={dutyTeams} onChange={e => setDutyTeams(e.target.value)} placeholder="Например: Команда №3, Команда №5" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Дежурные команды (из команд 1–8)</label>
+                <div className="flex gap-2">
+                  <select className="input" value={dutyTeam1} onChange={e => setDutyTeam1(e.target.value)}>
+                    <option value="">— Команда 1 —</option>
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n} disabled={String(n) === dutyTeam2}>Команда №{n}</option>
+                    ))}
+                  </select>
+                  <select className="input" value={dutyTeam2} onChange={e => setDutyTeam2(e.target.value)}>
+                    <option value="">— Команда 2 —</option>
+                    {[1,2,3,4,5,6,7,8].map(n => (
+                      <option key={n} value={n} disabled={String(n) === dutyTeam1}>Команда №{n}</option>
+                    ))}
+                  </select>
+                </div>
+                {(dutyTeam1 || dutyTeam2) && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Итого: {getDutyTeamsString(dutyTeam1, dutyTeam2)}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -211,14 +253,34 @@ export default function AdminDayPlan() {
               </div>
 
               {events.length > 0 && (
-                <div>
-                  <div className="text-sm font-medium text-gray-600 mb-1">Добавить мероприятие в план:</div>
-                  <div className="flex gap-2">
-                    <input type="time" className="input w-28 flex-shrink-0" value={newDraft.time} onChange={e => setNewDraft(p => ({ ...p, time: e.target.value }))} />
-                    <select className="input" onChange={e => e.target.value && addEventBlock(e.target.value)} defaultValue="">
+                <div className="border-t border-gray-100 pt-3">
+                  <div className="text-sm font-medium text-gray-600 mb-2">Добавить мероприятие в план:</div>
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="time"
+                      className="input w-28 flex-shrink-0"
+                      value={newDraft.time}
+                      onChange={e => setNewDraft(p => ({ ...p, time: e.target.value }))}
+                    />
+                    <select
+                      className="input flex-1 min-w-0"
+                      value={selectedEventId}
+                      onChange={e => setSelectedEventId(e.target.value)}
+                    >
                       <option value="">— Выбрать мероприятие —</option>
                       {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                     </select>
+                    <button
+                      onClick={addEventBlock}
+                      disabled={!selectedEventId || !newDraft.time}
+                      className="btn-primary px-3 flex-shrink-0"
+                      title="Добавить мероприятие в план"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Дружина и время берутся из выбранных выше полей
                   </div>
                 </div>
               )}
