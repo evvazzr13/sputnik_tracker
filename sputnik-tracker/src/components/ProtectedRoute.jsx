@@ -11,8 +11,9 @@ export default function ProtectedRoute({ children, requireRole }) {
     return <Navigate to={redirect} replace />
   }
 
-  // Counselor must be approved (team assigned)
-  if (userProfile?.role === 'counselor' && !userProfile?.teamId) {
+  // Counselor must be approved (team assigned) — except archive
+  const isArchivePath = typeof window !== 'undefined' && window.location.pathname === '/archive'
+  if (userProfile?.role === 'counselor' && !userProfile?.teamId && !isArchivePath) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="card max-w-md w-full text-center">

@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { format, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { Plus, Trash2, Send, Save, Pin, Calendar, CheckCircle, Bell, Star, Users } from 'lucide-react'
+import { BRIGADE_GROUPS } from '../../utils/brigade'
 
 export default function AdminDayPlan() {
   const { userProfile } = useAuth()
@@ -73,9 +74,11 @@ export default function AdminDayPlan() {
     setFixedBlocks(prev => prev.filter(b => b.id !== id))
   }
 
+  const [newBrigadeGroup, setNewBrigadeGroup] = useState('all')
+
   function addDraftBlock() {
     if (!newDraft.time || !newDraft.title.trim()) return
-    setDraftBlocks(prev => [...prev, { id: Date.now().toString(), time: newDraft.time, title: newDraft.title.trim() }].sort((a, b) => a.time.localeCompare(b.time)))
+    setDraftBlocks(prev => [...prev, { id: Date.now().toString(), time: newDraft.time, title: newDraft.title.trim(), brigadeGroup: newBrigadeGroup }].sort((a, b) => a.time.localeCompare(b.time)))
     setNewDraft({ time: '', title: '' })
   }
 
@@ -83,7 +86,7 @@ export default function AdminDayPlan() {
     const event = events.find(e => e.id === eventId)
     if (!event) return
     const time = newDraft.time || '12:00'
-    setDraftBlocks(prev => [...prev, { id: Date.now().toString(), time, title: event.name, eventId }].sort((a, b) => a.time.localeCompare(b.time)))
+    setDraftBlocks(prev => [...prev, { id: Date.now().toString(), time, title: event.name, eventId, brigadeGroup: newBrigadeGroup }].sort((a, b) => a.time.localeCompare(b.time)))
   }
 
   function removeDraftBlock(id) {
@@ -187,6 +190,15 @@ export default function AdminDayPlan() {
             {/* Variable blocks */}
             <div className="card space-y-4">
               <h2 className="font-semibold">Переменные события на {tomorrowLabel}</h2>
+
+              {/* Brigade group selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Для какой дружины:</label>
+                <select className="input text-sm" value={newBrigadeGroup} onChange={e => setNewBrigadeGroup(e.target.value)}>
+                  {BRIGADE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </div>
+
               <div className="flex gap-2">
                 <input type="time" className="input w-28 flex-shrink-0" value={newDraft.time} onChange={e => setNewDraft(p => ({ ...p, time: e.target.value }))} />
                 <input type="text" className="input" value={newDraft.title} onChange={e => setNewDraft(p => ({ ...p, title: e.target.value }))}
@@ -198,7 +210,7 @@ export default function AdminDayPlan() {
                 <div>
                   <div className="text-sm font-medium text-gray-600 mb-1">Добавить мероприятие в план:</div>
                   <div className="flex gap-2">
-                    <input type="time" className="input w-28 flex-shrink-0" value={newDraft.time} onChange={e => setNewDraft(p => ({ ...p, time: e.target.value }))} placeholder="Время" />
+                    <input type="time" className="input w-28 flex-shrink-0" value={newDraft.time} onChange={e => setNewDraft(p => ({ ...p, time: e.target.value }))} />
                     <select className="input" onChange={e => e.target.value && addEventBlock(e.target.value)} defaultValue="">
                       <option value="">— Выбрать мероприятие —</option>
                       {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
@@ -211,14 +223,20 @@ export default function AdminDayPlan() {
                 <div className="text-center py-4 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">Добавьте события выше</div>
               ) : (
                 <div className="space-y-1.5">
-                  {draftBlocks.map(block => (
-                    <div key={block.id} className={`flex items-center gap-2 p-2 rounded-lg ${block.eventId ? 'bg-purple-50' : 'bg-gray-50'}`}>
-                      <span className="text-sm font-mono text-blue-700 font-semibold w-12">{block.time}</span>
-                      <span className="flex-1 text-sm">{block.title}</span>
-                      {block.eventId && <span className="badge-blue text-xs">мероприятие</span>}
-                      <button onClick={() => removeDraftBlock(block.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  ))}
+                  {draftBlocks.map(block => {
+                    const bgLabel = BRIGADE_GROUPS.find(g => g.value === (block.brigadeGroup || 'all'))?.label
+                    return (
+                      <div key={block.id} className={`flex items-center gap-2 p-2 rounded-lg ${block.eventId ? 'bg-purple-50' : 'bg-gray-50'}`}>
+                        <span className="text-sm font-mono text-blue-700 font-semibold w-12">{block.time}</span>
+                        <span className="flex-1 text-sm">{block.title}</span>
+                        {block.brigadeGroup && block.brigadeGroup !== 'all' && (
+                          <span className="badge-yellow text-xs flex-shrink-0">{bgLabel}</span>
+                        )}
+                        {block.eventId && <span className="badge-blue text-xs flex-shrink-0">мероприятие</span>}
+                        <button onClick={() => removeDraftBlock(block.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
