@@ -21,9 +21,7 @@ export default function CounselorDashboard() {
   const todayLabel = format(new Date(), 'd MMMM yyyy', { locale: ru })
   const myBrigadeId = userProfile?.brigadeId
 
-  const now = new Date()
-  const tomorrowAvailable = now.getHours() > 23 || (now.getHours() === 23 && now.getMinutes() >= 30)
-  const maxDate = tomorrowAvailable ? format(addDays(new Date(), 1), 'yyyy-MM-dd') : today
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
   useEffect(() => {
     async function load() {
@@ -77,20 +75,22 @@ export default function CounselorDashboard() {
   }
 
   function nextDate() {
-    if (selectedDate >= maxDate) return
     const d = addDays(parseISO(selectedDate), 1)
     setSelectedDate(format(d, 'yyyy-MM-dd'))
   }
 
-  const canGoNext = selectedDate < maxDate
+  // Can go next if there's a published plan for the next day
+  const nextDayDate = format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd')
+  const canGoNext = !!plansByDate[nextDayDate]
 
-  // Show last 5 days + today + (tomorrow if available) as tabs
+  // Show last 5 days + today + tomorrow if published
   const dateRange = []
   for (let i = 4; i >= 0; i--) {
     dateRange.push(format(subDays(new Date(), i), 'yyyy-MM-dd'))
   }
-  if (tomorrowAvailable) {
-    dateRange.push(format(addDays(new Date(), 1), 'yyyy-MM-dd'))
+  // Add tomorrow tab only if a plan is published for it
+  if (plansByDate[tomorrow]) {
+    dateRange.push(tomorrow)
   }
 
   return (
@@ -180,9 +180,6 @@ export default function CounselorDashboard() {
 
         <div className="text-sm text-gray-400 mb-3">
           {format(parseISO(selectedDate), 'd MMMM yyyy (EEEE)', { locale: ru })}
-          {!tomorrowAvailable && (
-            <span className="ml-2 text-xs">· план на завтра появится в 23:30</span>
-          )}
         </div>
 
         {loading ? (

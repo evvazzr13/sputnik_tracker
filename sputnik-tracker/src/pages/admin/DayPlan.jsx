@@ -321,7 +321,7 @@ export default function AdminDayPlan() {
           {/* Preview */}
           <div className="card">
             <h2 className="font-semibold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-blue-600" /> Предпросмотр</h2>
-            <DayInfoPreview theme={theme} dutyTeams={dutyTeams} reminders={reminders} />
+            <DayInfoPreview theme={theme} dutyTeams={getDutyTeamsString(dutyTeam1, dutyTeam2)} reminders={reminders} />
             {allPreview.length === 0 ? (
               <div className="text-center py-6 text-gray-400 text-sm">Нет событий</div>
             ) : (
